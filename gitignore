@@ -1,0 +1,41 @@
+# Visual Studio / .NET
+.vs/
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+*.vspscc
+*.pdb
+*.cache
+*.log
+
+# Тести та покриття
+TestResults/
+*.coverage
+*.coveragexml
+*.msCoverage
+[Cc]overage*/
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+
+# Файли, які створює програма під час тестування (Lab-7)
+test.csv
+test.json
+t2.json
+
+# Rider / VS Code / ОС
+.idea/
+.vscode/
+*.DotSettings.user
+.DS_Store
+Thumbs.db
