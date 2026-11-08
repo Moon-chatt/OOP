@@ -1,0 +1,321 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+
+class Program
+{
+    static PowerbankStorage storage = new PowerbankStorage(1);
+    static Random rnd = new Random();
+    static DateTime minDate = new DateTime(2015, 1, 1);
+    static PowerbankState[] states = (PowerbankState[])Enum.GetValues(typeof(PowerbankState));
+
+    static void Main()
+    {
+        Console.OutputEncoding = Encoding.UTF8;
+        Console.InputEncoding = Encoding.UTF8;
+
+        int max = (int)ReadNumber("Введіть N (1-100): ", true, 1, 100);
+        storage = new PowerbankStorage(max);
+
+        while (true)
+        {
+            Console.WriteLine("\n1 – Додати об'єкт\n2 – Переглянути всі об'єкти\n3 – Знайти об'єкт\n4 – Продемонструвати поведінку\n5 – Видалити об'єкт\n6 – Продемонструвати static-методи\n0 – Вийти з програми");
+            int c = (int)ReadNumber("Вибір: ", true, 0, 6);
+
+            if (c == 0) { Console.WriteLine("Роботу завершено."); return; }
+            if (c == 1) Console.WriteLine(Add());
+            else if (c == 2) Console.WriteLine(ShowAll());
+            else if (c == 6) StaticDemo();
+            else if (storage.Count == 0) Console.WriteLine("Жодного об'єкта немає.");
+            else if (c == 3) Console.WriteLine(Search());
+            else if (c == 4) Demo();
+            else Console.WriteLine(Delete());
+        }
+    }
+
+    static string Add()
+    {
+        if (storage.IsFull) return $"Ліміт N = {storage.MaxCount} досягнуто.";
+
+        int mode = (int)ReadNumber("1 – вручну, 2 – автоматично (випадковий конструктор), 3 – з рядка (TryParse): ", true, 1, 3);
+        Powerbank p;
+        string how;
+
+        if (mode == 3)
+        {
+            while (true)
+            {
+                string str = Input("Рядок (Model,Capacity,Charge,dd.MM.yyyy,State) або 0 для скасування: ");
+                if (str == "0") return "Додавання скасовано.";
+
+                string error;
+                if (Powerbank.TryParse(str, out p, out error)) break;
+                Console.WriteLine(error);
+            }
+            how = p.ConstructorInfo + ", об'єкт створено через TryParse -> Parse";
+        }
+        else
+        {
+            try
+            {
+                if (mode == 1)
+                {
+                    p = new Powerbank();
+                    SetUntilValid(() => p.Model = Input("Модель (3-20 символів, латиниця/цифри/пробіл): "));
+                    SetUntilValid(() => p.CapacityMah = (int)ReadNumber("Ємність, мА·год (1000-50000): ", true));
+                    SetUntilValid(() => p.ChargePercent = ReadNumber("Заряд, % (0-100): ", false));
+                    SetUntilValid(() => p.ManufactureDate = ReadDate());
+                    SetUntilValid(() => p.State = ReadState());
+                    how = p.ConstructorInfo + ", значення задано через властивості";
+                }
+                else
+                {
+                    string model = "PowerBank " + rnd.Next(10, 100);
+                    int capacity = rnd.Next(2, 31) * 1000;
+                    double charge = Math.Round(rnd.NextDouble() * 100, 1);
+                    DateTime date = minDate.AddDays(rnd.Next((DateTime.Today - minDate).Days + 1));
+                    PowerbankState st = states[rnd.Next(states.Length)];
+                    bool withInitializer = false;
+
+                    switch (rnd.Next(5))
+                    {
+                        case 0:
+                            p = new Powerbank
+                            {
+                                Model = model,
+                                CapacityMah = capacity,
+                                ChargePercent = charge,
+                                ManufactureDate = date,
+                                State = st
+                            };
+                            withInitializer = true;
+                            break;
+                        case 1: p = new Powerbank(); break;
+                        case 2: p = new Powerbank(model, capacity); break;
+                        case 3: p = new Powerbank(model, capacity, charge); break;
+                        default: p = new Powerbank(model, capacity, charge, date, st); break;
+                    }
+                    how = p.ConstructorInfo + (withInitializer ? " + ініціалізатор об'єкта" : "");
+                }
+            }
+            catch (Exception ex)
+            {
+                return "Об'єкт не створено: " + ex.Message;
+            }
+        }
+
+        storage.Add(p);
+        return $"Спрацював конструктор: {how}\nДодано: {p}";
+    }
+
+    static string ShowAll()
+    {
+        string result = storage.Count == 0 ? "Жодного об'єкта немає." : Table(storage.GetAll());
+        return result + "\nЛічильник створених об'єктів: " + Powerbank.Counter;
+    }
+
+    static string Table(List<Powerbank> list)
+    {
+        string result = string.Format("{0,-4}{1,-20}{2,-12}{3,-10}{4,-12}{5,-14}", "№", "Модель", "Ємність", "Заряд,%", "Дата", "Стан");
+        foreach (Powerbank p in list)
+        {
+            result += "\n" + string.Format("{0,-4}{1,-20}{2,-12}{3,-10:F1}{4,-12:dd.MM.yyyy}{5,-14}",
+                                           storage.GetNumber(p), p.Model, p.CapacityMah, p.ChargePercent, p.ManufactureDate, p.State);
+        }
+        return result;
+    }
+
+    static string Search()
+    {
+        List<Powerbank> found;
+        if (ReadNumber("Пошук за: 1 – моделлю, 2 – станом: ", true, 1, 2) == 1)
+            found = storage.FindByModel(ReadText("Модель (або частина): "));
+        else
+            found = storage.FindByState(ReadState());
+
+        return found.Count == 0 ? "Нічого не знайдено." : Table(found);
+    }
+
+    static void Demo()
+    {
+        Console.WriteLine(Table(storage.GetAll()));
+        Powerbank p = storage.GetByNumber((int)ReadNumber("Номер об'єкта: ", true, 1, storage.Count));
+
+        while (true)
+        {
+            Console.WriteLine("\n1 – Charge(хвилини)\n2 – Charge(хвилини, струм)\n3 – Discharge\n4 – TogglePower\n5 – EstimateRuntime(Вт)\n6 – EstimateRuntime(В, А)\n7 – ToString\n8 – Властивості (get)\n0 – Назад");
+            int c = (int)ReadNumber("Вибір: ", true, 0, 8);
+
+            if (c == 0) return;
+            if (c == 1) Console.WriteLine(p.Charge((int)ReadNumber("Хвилин (1-600): ", true, 1, 600)));
+            else if (c == 2)
+            {
+                int min = (int)ReadNumber("Хвилин (1-600): ", true, 1, 600);
+                int ma = (int)ReadNumber("Струм зарядки, мА (100-5000): ", true, 100, 5000);
+                Console.WriteLine(p.Charge(min, ma));
+            }
+            else if (c == 3) Console.WriteLine(p.Discharge((int)ReadNumber("мА·год (1-50000): ", true, 1, 50000)));
+            else if (c == 4) Console.WriteLine(p.TogglePower());
+            else if (c == 5) Console.WriteLine(p.EstimateRuntime(ReadNumber("Потужність, Вт (0.5-200): ", false, 0.5, 200)));
+            else if (c == 6)
+            {
+                double v = ReadNumber("Напруга, В (1-20): ", false, 1, 20);
+                double a = ReadNumber("Струм, А (0.1-5): ", false, 0.1, 5);
+                Console.WriteLine(p.EstimateRuntime(v, a));
+            }
+            else if (c == 7) Console.WriteLine(p);
+            else Console.WriteLine($"Енергія: {p.StoredEnergyWh:F1} Вт·год, напруга: {Powerbank.NominalVoltage} В, заряджань: {p.ChargeCount}, конструктор: {p.ConstructorInfo}");
+        }
+    }
+
+    static void StaticDemo()
+    {
+        while (true)
+        {
+            Console.WriteLine("\n1 – MahToWh(ємність)\n2 – MinutesToFullCharge(ємність, струм)\n3 – Parse(рядок)\n4 – TryParse(рядок)\n5 – Змінити StandardCurrentMa\n0 – Назад");
+            int c = (int)ReadNumber("Вибір: ", true, 0, 5);
+
+            if (c == 0) return;
+            if (c == 1)
+            {
+                int mah = (int)ReadNumber("Ємність, мА·год (1-50000): ", true, 1, 50000);
+                Console.WriteLine($"{mah} мА·год = {Powerbank.MahToWh(mah):F1} Вт·год (напруга {Powerbank.NominalVoltage} В)");
+            }
+            else if (c == 2)
+            {
+                int capacity = (int)ReadNumber("Ємність, мА·год (1-50000): ", true, 1, 50000);
+                int current = (int)ReadNumber("Струм зарядки, мА (100-5000): ", true, 100, 5000);
+                Console.WriteLine($"Повна зарядка займе приблизно {Powerbank.MinutesToFullCharge(capacity, current)} хв");
+            }
+            else if (c == 3)
+            {
+                string s = Input("Рядок (Model,Capacity,Charge,dd.MM.yyyy,State): ");
+                try
+                {
+                    Powerbank temp = Powerbank.Parse(s);
+                    Powerbank.DecreaseCounter();
+                    Console.WriteLine($"Parse успішний: {temp.Model}, {temp.CapacityMah} мА·год, заряд {temp.ChargePercent:F1}%, {temp.State}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
+            else if (c == 4)
+            {
+                string s = Input("Рядок (Model,Capacity,Charge,dd.MM.yyyy,State): ");
+                Powerbank temp;
+                string error;
+                if (Powerbank.TryParse(s, out temp, out error))
+                {
+                    Powerbank.DecreaseCounter();
+                    Console.WriteLine($"TryParse повернув true: {temp.Model}, {temp.CapacityMah} мА·год, заряд {temp.ChargePercent:F1}%, {temp.State}");
+                }
+                else Console.WriteLine("TryParse повернув false. " + error);
+            }
+            else
+            {
+                SetUntilValid(() => Powerbank.StandardCurrentMa = (int)ReadNumber("Новий стандартний струм, мА (100-5000): ", true));
+                Console.WriteLine("StandardCurrentMa = " + Powerbank.StandardCurrentMa + " мА");
+            }
+        }
+    }
+
+    static string Delete()
+    {
+        if (ReadNumber("Видалити: 1 – за номером, 2 – за характеристикою: ", true, 1, 2) == 1)
+        {
+            Console.WriteLine(Table(storage.GetAll()));
+            storage.RemoveByNumber((int)ReadNumber("Номер: ", true, 1, storage.Count));
+            return "Видалено.";
+        }
+
+        int removed;
+        if (ReadNumber("Видалити за: 1 – моделлю, 2 – станом: ", true, 1, 2) == 1)
+            removed = storage.RemoveByModel(ReadText("Модель (або частина): "));
+        else
+            removed = storage.RemoveByState(ReadState());
+
+        return removed == 0 ? "Об'єктів не знайдено." : $"Видалено: {removed}";
+    }
+
+    static void SetUntilValid(Action setValue)
+    {
+        while (true)
+        {
+            try
+            {
+                setValue();
+                return;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+    }
+
+    static string Input(string prompt)
+    {
+        Console.Write(prompt);
+        return (Console.ReadLine() ?? "").Trim();
+    }
+
+    static string ReadText(string prompt)
+    {
+        while (true)
+        {
+            string s = Input(prompt);
+            if (s != "") return s;
+            Console.WriteLine("Error: відсутнє значення!");
+        }
+    }
+
+    static double ReadNumber(string prompt, bool integer)
+    {
+        while (true)
+        {
+            string s = Input(prompt).Replace(',', '.');
+
+            if (s == "") Console.WriteLine("Error: відсутнє значення!");
+            else if (!double.TryParse(s, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                                      CultureInfo.InvariantCulture, out double v)) Console.WriteLine("Error: не цифри!");
+            else if (integer && v != Math.Floor(v)) Console.WriteLine("Error: має бути ціле число!");
+            else if (Math.Abs(v) > 1e9) Console.WriteLine("Error: число завелике!");
+            else return v;
+        }
+    }
+
+    static double ReadNumber(string prompt, bool integer, double min, double max)
+    {
+        while (true)
+        {
+            double v = ReadNumber(prompt, integer);
+
+            if (v < 0) Console.WriteLine("Error: від'ємне значення!");
+            else if (v < min || v > max) Console.WriteLine($"Error: значення має бути від {min} до {max}!");
+            else return v;
+        }
+    }
+
+    static DateTime ReadDate()
+    {
+        while (true)
+        {
+            string s = Input("Дата виробництва (dd.MM.yyyy, від 01.01.2015 до сьогодні): ");
+
+            if (s == "") Console.WriteLine("Error: відсутнє значення!");
+            else if (!DateTime.TryParseExact(s, "dd.MM.yyyy", CultureInfo.InvariantCulture,
+                                             DateTimeStyles.None, out DateTime d)) Console.WriteLine("Error: формат має бути dd.MM.yyyy!");
+            else return d;
+        }
+    }
+
+    static PowerbankState ReadState()
+    {
+        for (int i = 0; i < states.Length; i++)
+            Console.WriteLine($"{i + 1} – {states[i]}");
+        return states[(int)ReadNumber("Стан: ", true, 1, states.Length) - 1];
+    }
+}
