@@ -43,12 +43,10 @@ dotnet run --project OOP_Lab1_Liashenko
 ## Структура репозиторію
 
 ```
-OOP_Lab1_Liashenko/
-├── OOP_Lab1_Liashenko.slnx
-├── OOP_Lab1_Liashenko/
-│   ├── Powerbank.cs
-│   ├── PowerbankState.cs
-│   ├── Program.cs
+ OOP_Lab1_Liashenko/
+ ├── Powerbank.cs
+ ├── PowerbankState.cs
+ ├── Program.cs
 ```
 
 | Файл | Призначення |
