@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 public static class PowerbankFiles
 {
     public const string CsvHeader = "Model,CapacityMah,ChargePercent,ManufactureDate,State";
@@ -40,6 +41,25 @@ public static class PowerbankFiles
         File.WriteAllText(path, json);
     }
 
+    private class PowerbankDto
+    {
+        [JsonProperty("model")]
+        public string? Model { get; set; } = "PowerBank";
+
+        [JsonProperty("capacity_mah")]
+        public int CapacityMah { get; set; } = 1000;
+
+        [JsonProperty("charge_percent")]
+        public double ChargePercent { get; set; } = 0;
+
+        [JsonProperty("manufacture_date")]
+        public DateTime ManufactureDate { get; set; } = DateTime.Today;
+
+        [JsonProperty("state")]
+        [JsonConverter(typeof(StringEnumConverter))]
+        public PowerbankState State { get; set; } = PowerbankState.Idle;
+    }
+
     public static List<Powerbank> ReadFromJson(string path)
     {
         string text = File.ReadAllText(path);
@@ -47,9 +67,16 @@ public static class PowerbankFiles
 
         try
         {
-            List<Powerbank> list = JsonConvert.DeserializeObject<List<Powerbank>>(text);
-            if (list == null) return new List<Powerbank>();
-            list.RemoveAll(x => x == null);
+           
+            List<PowerbankDto>? dtos = JsonConvert.DeserializeObject<List<PowerbankDto>>(text);
+            List<Powerbank> list = new List<Powerbank>();
+            if (dtos == null) return list;
+
+            foreach (PowerbankDto dto in dtos)
+            {
+                if (dto == null) continue;
+                list.Add(new Powerbank(dto.Model!, dto.CapacityMah, dto.ChargePercent, dto.ManufactureDate, dto.State));
+            }
             return list;
         }
         catch (Exception ex)
